@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -9,47 +10,56 @@ from app.api.health import router as health_router
 from app.schemas.errors import ErrorResponse
 
 app = FastAPI(
-    title="WindScope API",
-    version="1.0.0",
+title="WindScope API",
+version="1.0.0",
 )
 
+# Allow requests from the deployed WindScope frontend.
+
+app.add_middleware(
+CORSMiddleware,
+allow_origins=[
+"https://windscope-eta.vercel.app",
+"https://windscope-ngfdefvbp-ganesh-projects2.vercel.app",
+],
+allow_credentials=False,
+allow_methods=["GET", "POST", "OPTIONS"],
+allow_headers=["Content-Type", "Authorization"],
+)
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(
-    request: Request,
-    exc: StarletteHTTPException,
+request: Request,
+exc: StarletteHTTPException,
 ) -> JSONResponse:
-    error = ErrorResponse(
-        code=f"http_{exc.status_code}",
-        message=str(exc.detail),
-    )
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=error.model_dump(exclude_none=True),
-        headers=exc.headers,
-    )
-
+error = ErrorResponse(
+code=f"http_{exc.status_code}",
+message=str(exc.detail),
+)
+return JSONResponse(
+status_code=exc.status_code,
+content=error.model_dump(exclude_none=True),
+headers=exc.headers,
+)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
-    request: Request,
-    exc: RequestValidationError,
+request: Request,
+exc: RequestValidationError,
 ) -> JSONResponse:
-    error = ErrorResponse(
-        code="validation_error",
-        message="Request validation failed.",
-        details=exc.errors(),
-    )
-    return JSONResponse(
-        status_code=422,
-        content=jsonable_encoder(error.model_dump(exclude_none=True)),
-    )
-
+error = ErrorResponse(
+code="validation_error",
+message="Request validation failed.",
+details=exc.errors(),
+)
+return JSONResponse(
+status_code=422,
+content=jsonable_encoder(error.model_dump(exclude_none=True)),
+)
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"name": "WindScope API", "version": app.version}
-
+return {"name": "WindScope API", "version": app.version}
 
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
